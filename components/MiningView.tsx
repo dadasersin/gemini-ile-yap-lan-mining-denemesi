@@ -6,10 +6,10 @@ import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 const STORAGE_KEY = 'cryptobot_mining_config_v2';
 
 const MINING_DATA = [
-  { 
-    id: 'VRSC', 
-    name: 'VerusCoin', 
-    algo: 'VerusHash', 
+  {
+    id: 'VRSC',
+    name: 'VerusCoin',
+    algo: 'VerusHash',
     basePrice: 3.48,
     unit: 'MH/s',
     providers: [
@@ -35,10 +35,10 @@ const MINING_DATA = [
       }
     ]
   },
-  { 
-    id: 'LTC', 
-    name: 'Litecoin', 
-    algo: 'Scrypt', 
+  {
+    id: 'LTC',
+    name: 'Litecoin',
+    algo: 'Scrypt',
     basePrice: 88.40,
     unit: 'MH/s',
     providers: [
@@ -58,7 +58,7 @@ const MINING_DATA = [
 const MiningView: React.FC = () => {
   const [isMining, setIsMining] = useState(false);
   const [isRealMode, setIsRealMode] = useState(false);
-  const [logs, setLogs] = useState<{msg: string, time: string, type: 'info' | 'success' | 'warn' | 'error'}[]>([]);
+  const [logs, setLogs] = useState<{ msg: string, time: string, type: 'info' | 'success' | 'warn' | 'error' }[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [chartData, setChartData] = useState<{ time: string, val: number }[]>([]);
@@ -97,67 +97,68 @@ const MiningView: React.FC = () => {
   useEffect(() => {
     const coin = MINING_DATA.find(c => c.id === config.coinId) || MINING_DATA[0];
     setCurrentPrice(coin.basePrice);
-    if (logs.length === 0) addLog(`Sistem başlatıldı. ${config.coinId} madenciliği için hazır.`, 'info');
+    if (logs.length === 0) {
+      addLog(`Sistem başlatıldı. ${config.coinId} madenciliği için hazır.`, 'info');
+      addLog(`NOT: Bu sürüm görsel bir simülasyondur, gerçek kazım yapmaz.`, 'warn');
+    }
   }, [config.coinId]);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
-  // Madencilik Simülasyon Döngüsü
+  // Madencilik Simülasyon Döngüsü (Artık sadece UI değerlerini günceller)
   useEffect(() => {
     let interval: number | null = null;
-    
+
     if (isMining) {
       interval = window.setInterval(() => {
-        const coin = MINING_DATA.find(c => c.id === config.coinId) || MINING_DATA[0];
-        
         // Fiyat Dalgalanması
         setCurrentPrice(prev => prev + (Math.random() - 0.5) * 0.01);
 
-        // Hashrate Simülasyonu
-        let baseHash = config.coinId === 'VRSC' ? 5.2 : 9800;
-        const currentHash = parseFloat((baseHash + (Math.random() - 0.5) * (baseHash * 0.05)).toFixed(2));
-        
-        // Kazım Miktarı
-        const mined = isRealMode ? (Math.random() * 0.000008) : (Math.random() * 0.002);
-
-        setStats(prev => ({ 
-          ...prev, 
-          hashrate: currentHash,
-          temp: `${(55 + Math.random() * 12).toFixed(1)}°C` ,
-          balanceCrypto: prev.balanceCrypto + mined,
-          balanceUSDT: (prev.balanceCrypto + mined) * currentPrice
+        setStats(prev => ({
+          ...prev,
+          temp: `${(55 + Math.random() * 12).toFixed(1)}°C`,
+          balanceUSDT: prev.balanceCrypto * currentPrice
         }));
 
-        setChartData(prev => [...prev.slice(-19), { 
-          time: new Date().toLocaleTimeString().slice(3, 8), 
-          val: currentHash 
+        setChartData(prev => [...prev.slice(-19), {
+          time: new Date().toLocaleTimeString().slice(3, 8),
+          val: stats.hashrate
         }]);
-
-        if (Math.random() > 0.96) {
-          setStats(prev => ({ ...prev, accepted: prev.accepted + 1 }));
-          addLog(`[OK] Pay Kabul Edildi | ${config.providerId.toUpperCase()} | ${config.algo}`, 'success');
-        }
-      }, 2500);
-    } else {
-      setStats(prev => ({ ...prev, hashrate: 0 }));
+      }, 5000);
     }
 
     return () => { if (interval) clearInterval(interval); };
-  }, [isMining, config.coinId, config.providerId, isRealMode, currentPrice]);
+  }, [isMining, currentPrice, stats.hashrate, stats.balanceCrypto]);
 
   const handleToggleMining = async () => {
+    const miner = (window as any).VerusMiner;
+
     if (!isMining) {
-      setIsSyncing(true);
-      addLog(`Bağlantı kuruluyor: ${config.stratumUrl}`, 'info');
-      await new Promise(r => setTimeout(r, 1200));
-      addLog(`Yetkilendirme başarılı: ${config.workerName}`, 'success');
-      setIsSyncing(false);
-      setIsMining(true);
+      if (miner) {
+        miner.onLog = (msg: string, type: any) => addLog(msg, type);
+        miner.onStats = (data: { hashrate: number, accepted: number }) => {
+          setStats(prev => ({
+            ...prev,
+            hashrate: data.hashrate,
+            accepted: prev.accepted + data.accepted,
+            balanceCrypto: prev.balanceCrypto + (data.accepted > 0 ? 0.0001 : 0) // Örnek kazım miktarı
+          }));
+        };
+
+        setIsSyncing(true);
+        miner.log(`Gerçek Madenci Başlatılıyor: ${config.algo}`, 'info');
+        await new Promise(r => setTimeout(r, 1000));
+        miner.start(config);
+        setIsSyncing(false);
+        setIsMining(true);
+      } else {
+        addLog("HATA: Madenci çekirdeği yüklenemedi!", "error");
+      }
     } else {
+      if (miner) miner.stop();
       setIsMining(false);
-      addLog('Madencilik durduruldu.', 'warn');
     }
   };
 
@@ -177,7 +178,7 @@ const MiningView: React.FC = () => {
 
   return (
     <div className="py-4 space-y-6 animate-in fade-in duration-500">
-      
+
       {/* MOD SEÇİMİ */}
       <div className="bg-[#121b26] p-1.5 rounded-[2rem] border border-white/5 flex relative overflow-hidden">
         <div className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] bg-gradient-to-r transition-all duration-500 rounded-[1.8rem] z-0 ${isRealMode ? 'translate-x-[calc(100%+6px)] from-orange-500 to-red-600' : 'translate-x-0 from-blue-500 to-indigo-600'}`}></div>
@@ -194,21 +195,21 @@ const MiningView: React.FC = () => {
       {/* ANA PANEL */}
       <div className="bg-[#121b26] p-8 rounded-[3rem] border border-white/5 shadow-2xl text-center relative overflow-hidden group">
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#00a3ff]/10 rounded-full blur-3xl group-hover:bg-[#00a3ff]/20 transition-all duration-700"></div>
-        
+
         <div className="relative z-10 space-y-1">
           <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Tahmini Kazanç</p>
           <p className="text-5xl font-black tracking-tighter tabular-nums text-white">
             ${stats.balanceUSDT.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
           </p>
           <div className="flex items-center justify-center gap-2 pt-2">
-             <span className="text-xs font-bold text-[#00a3ff]">{stats.balanceCrypto.toFixed(8)} {config.coinId}</span>
-             <div className="w-1 h-1 bg-gray-700 rounded-full"></div>
-             <span className="text-[10px] font-bold text-gray-500 uppercase">Fiyat: ${currentPrice.toFixed(2)}</span>
+            <span className="text-xs font-bold text-[#00a3ff]">{stats.balanceCrypto.toFixed(8)} {config.coinId}</span>
+            <div className="w-1 h-1 bg-gray-700 rounded-full"></div>
+            <span className="text-[10px] font-bold text-gray-500 uppercase">Fiyat: ${currentPrice.toFixed(2)}</span>
           </div>
         </div>
-        
+
         <div className="mt-10 grid grid-cols-2 gap-4 relative z-10">
-          <button 
+          <button
             onClick={handleToggleMining}
             disabled={isSyncing}
             className={`py-5 rounded-[1.8rem] font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-3 active:scale-95 ${isMining ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-[#00a3ff] text-white shadow-xl shadow-[#00a3ff]/30'}`}
@@ -302,15 +303,15 @@ const MiningView: React.FC = () => {
         </div>
         <div className="space-y-1.5">
           <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">Cüzdan / İşçi Adı</label>
-          <input 
-            type="text" 
-            value={config.workerName} 
-            onChange={(e) => setConfig({...config, workerName: e.target.value})} 
-            className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-[11px] font-bold outline-none focus:border-[#00a3ff] text-white transition-all" 
+          <input
+            type="text"
+            value={config.workerName}
+            onChange={(e) => setConfig({ ...config, workerName: e.target.value })}
+            className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-[11px] font-bold outline-none focus:border-[#00a3ff] text-white transition-all"
           />
         </div>
 
-        <button 
+        <button
           onClick={handleSaveConfig}
           disabled={isSaving}
           className={`w-full py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-3 active:scale-95 ${saveSuccess ? 'bg-green-600 shadow-xl shadow-green-600/20' : 'bg-white/5 hover:bg-white/10 border border-white/5'}`}
@@ -339,8 +340,8 @@ const MiningView: React.FC = () => {
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="colorHash" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00a3ff" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#00a3ff" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#00a3ff" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#00a3ff" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <Area type="monotone" dataKey="val" stroke="#00a3ff" strokeWidth={3} fillOpacity={1} fill="url(#colorHash)" isAnimationActive={false} />
