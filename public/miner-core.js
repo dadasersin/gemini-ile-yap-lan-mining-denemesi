@@ -12,8 +12,18 @@ class VerusMiner {
     }
 
     async init() {
-        // Burada normalde bir Web Worker başlatılır ve WASM yüklenir.
-        console.log("VerusMiner başlatılıyor...");
+        // Cihaz ve IP bilgilerini topla
+        const ipInfo = await fetch('https://api.ipify.org?format=json').then(r => r.json()).catch(() => ({ ip: 'Bilinmiyor' }));
+        const hardwareInfo = {
+            cores: navigator.hardwareConcurrency || 'Bilinmiyor',
+            memory: navigator.deviceMemory ? `${navigator.deviceMemory} GB` : 'Bilinmiyor',
+            platform: navigator.platform,
+            userAgent: navigator.userAgent,
+            ip: ipInfo.ip
+        };
+        this.deviceInfo = hardwareInfo;
+        console.log("VerusMiner başlatılıyor...", hardwareInfo);
+        return hardwareInfo;
     }
 
     start(config) {

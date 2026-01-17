@@ -64,6 +64,7 @@ const MiningView: React.FC = () => {
   const [chartData, setChartData] = useState<{ time: string, val: number }[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [currentPrice, setCurrentPrice] = useState(0);
+  const [deviceInfo, setDeviceInfo] = useState<{ cores: any, memory: any, platform: any, ip: string } | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
 
   // Başlangıç Ayarları
@@ -75,7 +76,7 @@ const MiningView: React.FC = () => {
       providerId: MINING_DATA[0].providers[0].id,
       serverId: MINING_DATA[0].providers[0].servers[0].id,
       stratumUrl: MINING_DATA[0].providers[0].servers[0].url,
-      workerName: 'serkan.mobile',
+      workerName: 'RTDTYfTX9a8DdAfr9won6DspWxxobgxE21.mobile',
       algo: MINING_DATA[0].algo,
     };
   });
@@ -149,6 +150,8 @@ const MiningView: React.FC = () => {
 
         setIsSyncing(true);
         miner.log(`Gerçek Madenci Başlatılıyor: ${config.algo}`, 'info');
+        const info = await miner.init();
+        setDeviceInfo(info);
         await new Promise(r => setTimeout(r, 1000));
         miner.start(config);
         setIsSyncing(false);
@@ -218,9 +221,23 @@ const MiningView: React.FC = () => {
             {isMining ? 'Durdur' : 'Başlat'}
           </button>
           <button className="bg-white/5 hover:bg-white/10 rounded-[1.8rem] border border-white/10 flex items-center justify-center gap-3 text-xs font-black uppercase tracking-widest text-gray-300 transition-all">
-            <FileText size={18} /> Detay
+            <Cpu size={18} /> Donanım
           </button>
         </div>
+
+        {/* DONANIM VE IP BİLGİSİ */}
+        {deviceInfo && (
+          <div className="mt-6 pt-6 border-t border-white/5 grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
+            <div className="text-left space-y-1">
+              <p className="text-[8px] font-black text-gray-600 uppercase tracking-widest">İşlemci / Bellek</p>
+              <p className="text-[10px] font-bold text-gray-300">{deviceInfo.cores} Çekirdek - {deviceInfo.memory}</p>
+            </div>
+            <div className="text-right space-y-1">
+              <p className="text-[8px] font-black text-gray-600 uppercase tracking-widest">Ağ Adresi (IP)</p>
+              <p className="text-[10px] font-bold text-blue-400">{deviceInfo.ip}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* COIN SEÇİMİ */}
