@@ -1,17 +1,17 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Pickaxe, Activity, Server, Save, RefreshCcw, Terminal, Play, Square, Database, Info, Lock, Eye, EyeOff, FileText, DollarSign, X, TrendingUp, Zap, Check, Wallet, Globe, ShieldCheck, AlertCircle, ChevronRight, Cpu, Layers, MapPin, Network } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Pickaxe, RefreshCcw, Terminal, Play, Square, FileText, Lock, Globe, ShieldCheck, Zap, Check, Save, Layers, MapPin, Network, Cpu } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 
-const STORAGE_KEY = 'cryptobot_mining_config';
+const STORAGE_KEY = 'cryptobot_mining_config_v2';
 
-// Havuz ve Sunucu Veri Yapısı
 const MINING_DATA = [
   { 
     id: 'VRSC', 
     name: 'VerusCoin', 
     algo: 'VerusHash', 
     basePrice: 3.48,
+    unit: 'MH/s',
     providers: [
       {
         id: 'luckpool',
@@ -40,6 +40,7 @@ const MINING_DATA = [
     name: 'Litecoin', 
     algo: 'Scrypt', 
     basePrice: 88.40,
+    unit: 'MH/s',
     providers: [
       {
         id: 'binance',
@@ -48,15 +49,6 @@ const MINING_DATA = [
         fee: '0.6%',
         servers: [
           { id: 'global', name: 'Global Node', url: 'stratum+tcp://ltc.poolbinance.com:3333', ping: '20ms' }
-        ]
-      },
-      {
-        id: 'f2pool',
-        name: 'F2Pool',
-        officialUrl: 'f2pool.com',
-        fee: '2%',
-        servers: [
-          { id: 'eu', name: 'EU Server', url: 'stratum+tcp://ltc.f2pool.com:8888', ping: '35ms' }
         ]
       }
     ]
@@ -74,14 +66,18 @@ const MiningView: React.FC = () => {
   const [currentPrice, setCurrentPrice] = useState(0);
   const logEndRef = useRef<HTMLDivElement>(null);
 
-  // Gelişmiş Konfigürasyon State
-  const [config, setConfig] = useState({
-    coinId: MINING_DATA[0].id,
-    providerId: MINING_DATA[0].providers[0].id,
-    serverId: MINING_DATA[0].providers[0].servers[0].id,
-    stratumUrl: MINING_DATA[0].providers[0].servers[0].url,
-    workerName: 'serkan.mobile',
-    algo: MINING_DATA[0].algo,
+  // Başlangıç Ayarları
+  const [config, setConfig] = useState(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) return JSON.parse(saved);
+    return {
+      coinId: MINING_DATA[0].id,
+      providerId: MINING_DATA[0].providers[0].id,
+      serverId: MINING_DATA[0].providers[0].servers[0].id,
+      stratumUrl: MINING_DATA[0].providers[0].servers[0].url,
+      workerName: 'serkan.mobile',
+      algo: MINING_DATA[0].algo,
+    };
   });
 
   const [stats, setStats] = useState({
@@ -92,139 +88,122 @@ const MiningView: React.FC = () => {
     balanceUSDT: 0,
   });
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setConfig(parsed);
-    }
-    const coin = MINING_DATA.find(c => c.id === config.coinId) || MINING_DATA[0];
-    setCurrentPrice(coin.basePrice);
-    addLog(`Sistem Hazır. Havuz: ${config.providerId.toUpperCase()}`, 'info');
-  }, []);
-
-  useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logs]);
-
-  // Madencilik Simülasyonu
-  useEffect(() => {
-    let interval: number;
-    if (isMining) {
-      interval = window.setInterval(() => {
-        const coin = MINING_DATA.find(c => c.id === config.coinId) || MINING_DATA[0];
-        const newPrice = coin.basePrice + (Math.random() - 0.5) * 0.05;
-        setCurrentPrice(newPrice);
-
-        let baseHash = config.coinId === 'VRSC' ? 5.2 : 9800;
-        const currentHash = parseFloat((baseHash + (Math.random() - 0.5) * 0.5).toFixed(2));
-        const mined = isRealMode ? (Math.random() * 0.00005) : (Math.random() * 0.01);
-
-        setStats(prev => ({ 
-          ...prev, 
-          hashrate: currentHash,
-          temp: `${(62 + Math.random() * 5).toFixed(1)}°C` ,
-          balanceCrypto: prev.balanceCrypto + mined,
-          balanceUSDT: (prev.balanceCrypto + mined) * newPrice
-        }));
-
-        setChartData(prev => [...prev.slice(-19), { time: new Date().toLocaleTimeString().slice(3, 8), val: currentHash }]);
-
-        if (Math.random() > 0.95) {
-          setStats(prev => ({ ...prev, accepted: prev.accepted + 1 }));
-          addLog(`[PAY] Kabul Edildi: ${config.stratumUrl.split('//')[1]}`, 'success');
-        }
-      }, 3000);
-    }
-    return () => clearInterval(interval);
-  }, [isMining, config, isRealMode]);
-
+  // Log Ekleme Fonksiyonu
   const addLog = (msg: string, type: 'info' | 'success' | 'warn' | 'error' = 'info') => {
     const time = new Date().toLocaleTimeString();
     setLogs(prev => [...prev.slice(-49), { msg, time, type }]);
   };
 
+  useEffect(() => {
+    const coin = MINING_DATA.find(c => c.id === config.coinId) || MINING_DATA[0];
+    setCurrentPrice(coin.basePrice);
+    if (logs.length === 0) addLog(`Sistem başlatıldı. ${config.coinId} madenciliği için hazır.`, 'info');
+  }, [config.coinId]);
+
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [logs]);
+
+  // Madencilik Simülasyon Döngüsü
+  useEffect(() => {
+    let interval: number | null = null;
+    
+    if (isMining) {
+      interval = window.setInterval(() => {
+        const coin = MINING_DATA.find(c => c.id === config.coinId) || MINING_DATA[0];
+        
+        // Fiyat Dalgalanması
+        setCurrentPrice(prev => prev + (Math.random() - 0.5) * 0.01);
+
+        // Hashrate Simülasyonu
+        let baseHash = config.coinId === 'VRSC' ? 5.2 : 9800;
+        const currentHash = parseFloat((baseHash + (Math.random() - 0.5) * (baseHash * 0.05)).toFixed(2));
+        
+        // Kazım Miktarı
+        const mined = isRealMode ? (Math.random() * 0.000008) : (Math.random() * 0.002);
+
+        setStats(prev => ({ 
+          ...prev, 
+          hashrate: currentHash,
+          temp: `${(55 + Math.random() * 12).toFixed(1)}°C` ,
+          balanceCrypto: prev.balanceCrypto + mined,
+          balanceUSDT: (prev.balanceCrypto + mined) * currentPrice
+        }));
+
+        setChartData(prev => [...prev.slice(-19), { 
+          time: new Date().toLocaleTimeString().slice(3, 8), 
+          val: currentHash 
+        }]);
+
+        if (Math.random() > 0.96) {
+          setStats(prev => ({ ...prev, accepted: prev.accepted + 1 }));
+          addLog(`[OK] Pay Kabul Edildi | ${config.providerId.toUpperCase()} | ${config.algo}`, 'success');
+        }
+      }, 2500);
+    } else {
+      setStats(prev => ({ ...prev, hashrate: 0 }));
+    }
+
+    return () => { if (interval) clearInterval(interval); };
+  }, [isMining, config.coinId, config.providerId, isRealMode, currentPrice]);
+
   const handleToggleMining = async () => {
     if (!isMining) {
       setIsSyncing(true);
-      addLog(`${config.coinId} için ${config.providerId} havuzuna bağlanılıyor...`, 'info');
-      await new Promise(r => setTimeout(r, 1500));
-      addLog(`Bölge: ${config.serverId.toUpperCase()} sunucusu aktif.`, 'success');
+      addLog(`Bağlantı kuruluyor: ${config.stratumUrl}`, 'info');
+      await new Promise(r => setTimeout(r, 1200));
+      addLog(`Yetkilendirme başarılı: ${config.workerName}`, 'success');
       setIsSyncing(false);
       setIsMining(true);
     } else {
       setIsMining(false);
-      addLog('Madenci durduruldu.', 'warn');
+      addLog('Madencilik durduruldu.', 'warn');
     }
   };
 
-  const updateCoin = (coinId: string) => {
-    const coin = MINING_DATA.find(c => c.id === coinId)!;
-    const provider = coin.providers[0];
-    const server = provider.servers[0];
-    setConfig({
-      ...config,
-      coinId,
-      algo: coin.algo,
-      providerId: provider.id,
-      serverId: server.id,
-      stratumUrl: server.url
-    });
-    setCurrentPrice(coin.basePrice);
-    addLog(`${coin.name} seçildi.`, 'info');
+  const handleSaveConfig = () => {
+    setIsSaving(true);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    setTimeout(() => {
+      setIsSaving(false);
+      setSaveSuccess(true);
+      addLog('Yapılandırma başarıyla kaydedildi.', 'success');
+      setTimeout(() => setSaveSuccess(false), 2000);
+    }, 800);
   };
 
-  const updateProvider = (providerId: string) => {
-    const coin = MINING_DATA.find(c => c.id === config.coinId)!;
-    const provider = coin.providers.find(p => p.id === providerId)!;
-    const server = provider.servers[0];
-    setConfig({
-      ...config,
-      providerId,
-      serverId: server.id,
-      stratumUrl: server.url
-    });
-    addLog(`Havuz değiştirildi: ${provider.name}`, 'info');
-  };
-
-  const updateServer = (serverId: string) => {
-    const coin = MINING_DATA.find(c => c.id === config.coinId)!;
-    const provider = coin.providers.find(p => p.id === config.providerId)!;
-    const server = provider.servers.find(s => s.id === serverId)!;
-    setConfig({ ...config, serverId, stratumUrl: server.url });
-    addLog(`Sunucu/Bölge güncellendi: ${server.name}`, 'info');
-  };
-
-  const activeCoin = MINING_DATA.find(c => c.id === config.coinId)!;
-  const activeProvider = activeCoin.providers.find(p => p.id === config.providerId)!;
+  const activeCoin = useMemo(() => MINING_DATA.find(c => c.id === config.coinId) || MINING_DATA[0], [config.coinId]);
+  const activeProvider = useMemo(() => activeCoin.providers.find(p => p.id === config.providerId) || activeCoin.providers[0], [activeCoin, config.providerId]);
 
   return (
-    <div className="py-4 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="py-4 space-y-6 animate-in fade-in duration-500">
       
-      {/* Demo/Gerçek Şalteri */}
-      <div className="bg-[#121b26] p-1.5 rounded-[2rem] border border-white/5 shadow-2xl flex relative overflow-hidden">
-        <div className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] bg-gradient-to-r transition-all duration-500 rounded-[1.8rem] z-0 ${isRealMode ? 'translate-x-[calc(100%+6px)] from-yellow-500 to-orange-600' : 'translate-x-0 from-[#00a3ff] to-blue-700'}`}></div>
-        <button onClick={() => setIsRealMode(false)} className={`relative z-10 flex-1 py-3.5 flex flex-col items-center gap-1 transition-colors ${!isRealMode ? 'text-white' : 'text-gray-500'}`}>
-          <Globe size={16} />
-          <span className="text-[9px] font-black uppercase tracking-widest">Demo Modu</span>
+      {/* MOD SEÇİMİ */}
+      <div className="bg-[#121b26] p-1.5 rounded-[2rem] border border-white/5 flex relative overflow-hidden">
+        <div className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] bg-gradient-to-r transition-all duration-500 rounded-[1.8rem] z-0 ${isRealMode ? 'translate-x-[calc(100%+6px)] from-orange-500 to-red-600' : 'translate-x-0 from-blue-500 to-indigo-600'}`}></div>
+        <button onClick={() => setIsRealMode(false)} className={`relative z-10 flex-1 py-3 flex flex-col items-center gap-0.5 transition-colors ${!isRealMode ? 'text-white' : 'text-gray-500'}`}>
+          <Globe size={14} />
+          <span className="text-[8px] font-black uppercase tracking-tighter">Demo Modu</span>
         </button>
-        <button onClick={() => setIsRealMode(true)} className={`relative z-10 flex-1 py-3.5 flex flex-col items-center gap-1 transition-colors ${isRealMode ? 'text-black' : 'text-gray-500'}`}>
-          <ShieldCheck size={16} />
-          <span className="text-[9px] font-black uppercase tracking-widest">Gerçek Mod</span>
+        <button onClick={() => setIsRealMode(true)} className={`relative z-10 flex-1 py-3 flex flex-col items-center gap-0.5 transition-colors ${isRealMode ? 'text-white' : 'text-gray-500'}`}>
+          <ShieldCheck size={14} />
+          <span className="text-[8px] font-black uppercase tracking-tighter">Gerçek Mod</span>
         </button>
       </div>
 
-      {/* Ana Bakiye Kartı */}
-      <div className="bg-[#121b26] p-8 rounded-[3rem] border border-white/5 shadow-2xl text-center relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-[#00a3ff]/5 to-transparent pointer-events-none"></div>
-        <div className="relative z-10">
-          <p className="text-5xl font-black tracking-tighter tabular-nums mb-3">
-            ${stats.balanceUSDT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      {/* ANA PANEL */}
+      <div className="bg-[#121b26] p-8 rounded-[3rem] border border-white/5 shadow-2xl text-center relative overflow-hidden group">
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#00a3ff]/10 rounded-full blur-3xl group-hover:bg-[#00a3ff]/20 transition-all duration-700"></div>
+        
+        <div className="relative z-10 space-y-1">
+          <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Tahmini Kazanç</p>
+          <p className="text-5xl font-black tracking-tighter tabular-nums text-white">
+            ${stats.balanceUSDT.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
           </p>
-          <div className="flex items-center justify-center gap-2">
-             <span className="text-xs font-bold text-[#00a3ff]">{stats.balanceCrypto.toFixed(6)} {config.coinId}</span>
+          <div className="flex items-center justify-center gap-2 pt-2">
+             <span className="text-xs font-bold text-[#00a3ff]">{stats.balanceCrypto.toFixed(8)} {config.coinId}</span>
              <div className="w-1 h-1 bg-gray-700 rounded-full"></div>
-             <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Market: ${currentPrice.toFixed(2)}</span>
+             <span className="text-[10px] font-bold text-gray-500 uppercase">Fiyat: ${currentPrice.toFixed(2)}</span>
           </div>
         </div>
         
@@ -232,26 +211,29 @@ const MiningView: React.FC = () => {
           <button 
             onClick={handleToggleMining}
             disabled={isSyncing}
-            className={`py-5 rounded-[1.8rem] font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${isMining ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-[#00a3ff] text-white shadow-xl shadow-[#00a3ff]/30 active:scale-95'}`}
+            className={`py-5 rounded-[1.8rem] font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-3 active:scale-95 ${isMining ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-[#00a3ff] text-white shadow-xl shadow-[#00a3ff]/30'}`}
           >
             {isSyncing ? <RefreshCcw size={18} className="animate-spin" /> : isMining ? <Square size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
             {isMining ? 'Durdur' : 'Başlat'}
           </button>
           <button className="bg-white/5 hover:bg-white/10 rounded-[1.8rem] border border-white/10 flex items-center justify-center gap-3 text-xs font-black uppercase tracking-widest text-gray-300 transition-all">
-            <FileText size={18} /> Rapor
+            <FileText size={18} /> Detay
           </button>
         </div>
       </div>
 
-      {/* ADIM 1: COIN SEÇİMİ */}
+      {/* COIN SEÇİMİ */}
       <div className="bg-[#121b26] p-6 rounded-[2.5rem] border border-white/5 space-y-4">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1">1. Madencilik Varılğı</h3>
+        <div className="flex items-center gap-2 px-1">
+          <div className="w-1 h-4 bg-[#00a3ff] rounded-full"></div>
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Varlık Seçimi</h3>
+        </div>
         <div className="flex gap-2.5">
           {MINING_DATA.map((c) => (
             <button
               key={c.id}
-              onClick={() => updateCoin(c.id)}
-              className={`flex-1 py-4 rounded-2xl border transition-all flex flex-col items-center gap-1 ${config.coinId === c.id ? 'bg-[#00a3ff] border-[#00a3ff] text-white shadow-lg shadow-[#00a3ff]/20' : 'bg-black/40 border-white/5 text-gray-500'}`}
+              onClick={() => setConfig({ ...config, coinId: c.id, algo: c.algo, providerId: c.providers[0].id, serverId: c.providers[0].servers[0].id, stratumUrl: c.providers[0].servers[0].url })}
+              className={`flex-1 py-4 rounded-2xl border transition-all flex flex-col items-center gap-1 ${config.coinId === c.id ? 'bg-[#00a3ff] border-[#00a3ff] text-white shadow-lg shadow-[#00a3ff]/20' : 'bg-black/40 border-white/5 text-gray-600 hover:border-white/10'}`}
             >
               <span className="text-sm font-black">{c.id}</span>
               <span className="text-[8px] font-bold opacity-60 uppercase">{c.algo}</span>
@@ -260,123 +242,135 @@ const MiningView: React.FC = () => {
         </div>
       </div>
 
-      {/* ADIM 2: HAVUZ (POOL) SAĞLAYICISI */}
-      <div className="bg-[#121b26] p-6 rounded-[2.5rem] border border-white/5 space-y-4">
-        <div className="flex justify-between items-center px-1">
-          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">2. Havuz Sağlayıcısı</h3>
-          <span className="text-[9px] font-bold text-gray-600 bg-white/5 px-2 py-0.5 rounded-md">Resmi Destek</span>
-        </div>
-        <div className="grid grid-cols-1 gap-2.5">
-          {activeCoin.providers.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => updateProvider(p.id)}
-              className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${config.providerId === p.id ? 'bg-white/5 border-[#00a3ff] text-white shadow-inner' : 'bg-black/20 border-white/5 text-gray-500 hover:bg-white/5'}`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`p-2.5 rounded-xl ${config.providerId === p.id ? 'bg-[#00a3ff] text-white' : 'bg-white/5'}`}>
-                  <Layers size={16} />
+      {/* HAVUZ VE BÖLGE */}
+      <div className="bg-[#121b26] p-6 rounded-[2.5rem] border border-white/5 space-y-6">
+        <div className="space-y-4">
+          <div className="flex justify-between items-center px-1">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Havuz Sağlayıcısı</h3>
+            <span className="text-[9px] font-bold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-md">Aktif</span>
+          </div>
+          <div className="grid grid-cols-1 gap-2.5">
+            {activeCoin.providers.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setConfig({ ...config, providerId: p.id, serverId: p.servers[0].id, stratumUrl: p.servers[0].url })}
+                className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${config.providerId === p.id ? 'bg-white/5 border-[#00a3ff] text-white shadow-inner' : 'bg-black/20 border-white/5 text-gray-600 hover:bg-white/5'}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl ${config.providerId === p.id ? 'bg-[#00a3ff] text-white' : 'bg-white/5'}`}>
+                    <Layers size={16} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-black">{p.name}</p>
+                    <p className="text-[9px] opacity-50 font-bold">{p.officialUrl}</p>
+                  </div>
                 </div>
-                <div className="text-left">
-                  <p className="text-xs font-black">{p.name}</p>
-                  <p className="text-[9px] opacity-50 font-bold">{p.officialUrl}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[9px] font-black text-green-500 bg-green-500/10 px-2 py-1 rounded-lg">FEE: {p.fee}</span>
-                {config.providerId === p.id && <Check size={14} className="text-[#00a3ff]" />}
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ADIM 3: BÖLGE VE SUNUCU SEÇİMİ */}
-      <div className="bg-[#121b26] p-6 rounded-[2.5rem] border border-white/5 space-y-4">
-        <div className="flex justify-between items-center px-1">
-          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">3. Sunucu Bölgesi</h3>
-          <div className="flex items-center gap-1 text-[9px] text-gray-600 font-bold">
-            <Network size={10} /> Latency (Gecikme)
+                <span className="text-[9px] font-black text-gray-400">Komisyon: {p.fee}</span>
+              </button>
+            ))}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {activeProvider.servers.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => updateServer(s.id)}
-              className={`px-4 py-3 rounded-xl border transition-all flex items-center gap-2 ${config.serverId === s.id ? 'bg-[#00a3ff]/10 border-[#00a3ff] text-[#00a3ff]' : 'bg-black/40 border-white/5 text-gray-600 hover:border-white/10'}`}
-            >
-              <MapPin size={12} />
-              <div className="text-left">
-                <p className="text-[10px] font-black">{s.name}</p>
-                <p className="text-[8px] font-bold opacity-60 uppercase">{s.ping}</p>
-              </div>
-            </button>
-          ))}
+
+        <div className="space-y-4">
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">Sunucu Bölgesi</h3>
+          <div className="flex flex-wrap gap-2">
+            {activeProvider.servers.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setConfig({ ...config, serverId: s.id, stratumUrl: s.url })}
+                className={`px-4 py-3 rounded-xl border transition-all flex items-center gap-2 ${config.serverId === s.id ? 'bg-[#00a3ff]/10 border-[#00a3ff] text-[#00a3ff]' : 'bg-black/40 border-white/5 text-gray-600'}`}
+              >
+                <MapPin size={12} />
+                <div className="text-left">
+                  <p className="text-[10px] font-black">{s.name}</p>
+                  <p className="text-[8px] font-bold opacity-60 uppercase">{s.ping}</p>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Yapılandırma Formu */}
+      {/* FORM AYARLARI */}
       <div className="bg-[#121b26] p-7 rounded-[2.5rem] border border-white/5 space-y-5">
         <div className="space-y-1.5">
-          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">Stratum Bağlantısı</label>
-          <div className="relative group">
-            <input 
-              type="text" 
-              readOnly 
-              value={config.stratumUrl} 
-              className="w-full bg-black/40 border border-white/5 rounded-2xl p-4 text-[10px] font-mono text-gray-400 outline-none" 
-            />
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-              <span className="text-[8px] font-black text-gray-700 group-hover:text-gray-500 transition-colors uppercase">ReadOnly</span>
-              <Lock size={12} className="text-gray-700" />
-            </div>
+          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">Bağlantı Adresi (Read Only)</label>
+          <div className="relative">
+            <input type="text" readOnly value={config.stratumUrl} className="w-full bg-black/40 border border-white/5 rounded-2xl p-4 text-[10px] font-mono text-gray-500 outline-none" />
+            <Lock size={12} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-700" />
           </div>
         </div>
         <div className="space-y-1.5">
-          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">
-            {config.coinId === 'VRSC' ? 'Cüzdan Adresi (LuckPool)' : 'İşçi Adı (Worker)'}
-          </label>
+          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">Cüzdan / İşçi Adı</label>
           <input 
             type="text" 
             value={config.workerName} 
             onChange={(e) => setConfig({...config, workerName: e.target.value})} 
-            placeholder="Adresinizi buraya girin..."
-            className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-[10px] font-bold outline-none focus:border-[#00a3ff]/40 text-white placeholder:text-gray-800 transition-all" 
+            className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-[11px] font-bold outline-none focus:border-[#00a3ff] text-white transition-all" 
           />
         </div>
 
         <button 
-          onClick={() => {
-            setIsSaving(true);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-            setTimeout(() => { setIsSaving(false); setSaveSuccess(true); setTimeout(() => setSaveSuccess(false), 2000); }, 1000);
-          }}
-          className={`w-full py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${saveSuccess ? 'bg-green-600 shadow-xl shadow-green-600/20' : 'bg-white/5 hover:bg-white/10 border border-white/5'}`}
+          onClick={handleSaveConfig}
+          disabled={isSaving}
+          className={`w-full py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-3 active:scale-95 ${saveSuccess ? 'bg-green-600 shadow-xl shadow-green-600/20' : 'bg-white/5 hover:bg-white/10 border border-white/5'}`}
         >
           {isSaving ? <RefreshCcw size={14} className="animate-spin" /> : saveSuccess ? <Check size={14} /> : <Save size={14} />}
-          {isSaving ? 'Yükleniyor...' : 'Ayarları Kaydet'}
+          {isSaving ? 'Kaydediliyor...' : 'Yapılandırmayı Onayla'}
         </button>
       </div>
 
-      {/* Konsol / Log Ekranı */}
+      {/* GRAFİK */}
+      <div className="bg-[#121b26] p-6 rounded-[2.5rem] border border-white/5 space-y-6">
+        <div className="flex justify-between items-end px-1">
+          <div className="space-y-1">
+            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Performans</p>
+            <p className="text-2xl font-black tabular-nums">{stats.hashrate} <span className="text-[10px] text-gray-600">{activeCoin.unit}</span></p>
+          </div>
+          <div className="text-right space-y-1">
+            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Sıcaklık</p>
+            <p className={`text-sm font-black flex items-center gap-1 justify-end ${parseFloat(stats.temp) > 75 ? 'text-red-500' : 'text-green-400'}`}>
+              <Zap size={14} fill="currentColor" /> {stats.temp}
+            </p>
+          </div>
+        </div>
+        <div className="h-24 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData}>
+              <defs>
+                <linearGradient id="colorHash" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#00a3ff" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#00a3ff" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <Area type="monotone" dataKey="val" stroke="#00a3ff" strokeWidth={3} fillOpacity={1} fill="url(#colorHash)" isAnimationActive={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* KONSOL */}
       <div className="bg-black/95 rounded-[2.5rem] border border-white/5 overflow-hidden shadow-2xl">
         <div className="bg-[#1a1a1a] px-6 py-4 border-b border-white/5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Terminal size={14} className="text-green-500" />
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mining Console</span>
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Log Console</span>
           </div>
-          <div className={`w-2 h-2 rounded-full ${isMining ? 'bg-green-500 animate-pulse' : 'bg-gray-700'}`}></div>
+          <div className={`w-2 h-2 rounded-full ${isMining ? 'bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]' : 'bg-gray-700'}`}></div>
         </div>
         <div className="h-40 overflow-y-auto p-6 font-mono text-[10px] space-y-2 no-scrollbar bg-black/50">
-          {logs.map((log, i) => (
-            <div key={i} className="flex gap-3 animate-in slide-in-from-left-2">
-              <span className="text-gray-700 shrink-0">[{log.time}]</span>
-              <span className={log.type === 'success' ? 'text-green-400' : log.type === 'warn' ? 'text-yellow-500' : log.type === 'error' ? 'text-red-500' : 'text-blue-400'}>
-                {log.msg}
-              </span>
-            </div>
-          ))}
+          {logs.length === 0 ? (
+            <div className="text-gray-800 italic">Sistem logları bekleniyor...</div>
+          ) : (
+            logs.map((log, i) => (
+              <div key={i} className="flex gap-3 animate-in slide-in-from-left-2">
+                <span className="text-gray-700 shrink-0">[{log.time}]</span>
+                <span className={log.type === 'success' ? 'text-green-400' : log.type === 'warn' ? 'text-yellow-500' : log.type === 'error' ? 'text-red-500' : 'text-blue-400'}>
+                  {log.msg}
+                </span>
+              </div>
+            ))
+          )}
           <div ref={logEndRef} />
         </div>
       </div>
