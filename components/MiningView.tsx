@@ -102,7 +102,6 @@ const MiningView: React.FC = () => {
     setCurrentPrice(coin.basePrice);
     if (logs.length === 0) {
       addLog(`Sistem başlatıldı. ${config.coinId} madenciliği için hazır.`, 'info');
-      addLog(`NOT: Bu sürüm görsel bir simülasyondur, gerçek kazım yapmaz.`, 'warn');
     }
   }, [config.coinId]);
 
@@ -156,6 +155,7 @@ const MiningView: React.FC = () => {
 
     if (!isMining) {
       if (miner) {
+        addLog("Madenci bileşeni bağlandı, başlatılıyor...", "info");
         miner.onLog = (msg: string, type: any) => addLog(msg, type);
         miner.onStats = (data: { hashrate: number, accepted: number }) => {
           setStats(prev => ({
