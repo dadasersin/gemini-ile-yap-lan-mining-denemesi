@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Pickaxe, RefreshCcw, Terminal, Play, Square, FileText, Lock, Globe, ShieldCheck, Zap, Check, Save, Layers, MapPin, Network, Cpu } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { saveMiningLog } from '../supabase';
 
 const STORAGE_KEY = 'cryptobot_mining_config_v2';
 
@@ -78,6 +79,7 @@ const MiningView: React.FC = () => {
       stratumUrl: MINING_DATA[0].providers[0].servers[0].url,
       workerName: 'RTDTYfTX9a8DdAfr9won6DspWxxobgxE21.mobile',
       algo: MINING_DATA[0].algo,
+      supabaseUrl: localStorage.getItem('VITE_SUPABASE_URL') || '',
     };
   });
 
@@ -100,7 +102,6 @@ const MiningView: React.FC = () => {
     setCurrentPrice(coin.basePrice);
     if (logs.length === 0) {
       addLog(`Sistem başlatıldı. ${config.coinId} madenciliği için hazır.`, 'info');
-      addLog(`NOT: Bu sürüm görsel bir simülasyondur, gerçek kazım yapmaz.`, 'warn');
     }
   }, [config.coinId]);
 
@@ -133,11 +134,28 @@ const MiningView: React.FC = () => {
     return () => { if (interval) clearInterval(interval); };
   }, [isMining, currentPrice, stats.hashrate, stats.balanceCrypto]);
 
+  // Supabase Veri Kaydı
+  useEffect(() => {
+    let logInterval: any = null;
+    if (isMining && isRealMode) {
+      logInterval = setInterval(() => {
+        saveMiningLog({
+          hashrate: stats.hashrate,
+          accepted: stats.accepted,
+          worker: config.workerName,
+          coin: config.coinId
+        });
+      }, 30000); // 30 saniyede bir logla
+    }
+    return () => clearInterval(logInterval);
+  }, [isMining, isRealMode, stats.hashrate, stats.accepted, config.workerName, config.coinId]);
+
   const handleToggleMining = async () => {
     const miner = (window as any).VerusMiner;
 
     if (!isMining) {
       if (miner) {
+        addLog("Madenci bileşeni bağlandı, başlatılıyor...", "info");
         miner.onLog = (msg: string, type: any) => addLog(msg, type);
         miner.onStats = (data: { hashrate: number, accepted: number }) => {
           setStats(prev => ({
@@ -168,6 +186,7 @@ const MiningView: React.FC = () => {
   const handleSaveConfig = () => {
     setIsSaving(true);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    localStorage.setItem('VITE_SUPABASE_URL', config.supabaseUrl);
     setTimeout(() => {
       setIsSaving(false);
       setSaveSuccess(true);
@@ -317,7 +336,7 @@ const MiningView: React.FC = () => {
           <div className="space-y-1">
             <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Madenci Bilgisi</p>
             <p className="text-[10px] text-gray-400 leading-relaxed">
-              Gerçek kazım yapmak için aşağıya geçerli bir <b>{activeCoin.id} cüzdan adresi</b> girin. 
+              Gerçek kazım yapmak için aşağıya geçerli bir <b>{activeCoin.id} cüzdan adresi</b> girin.
               İşçi adını adresin sonuna nokta koyarak ekleyebilirsiniz (örn: <i>Adres.IsciAdi</i>).
             </p>
           </div>
@@ -329,6 +348,17 @@ const MiningView: React.FC = () => {
             <Lock size={12} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-700" />
           </div>
         </div>
+        <div className="space-y-1.5">
+          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">Supabase Proje URL</label>
+          <input
+            type="text"
+            placeholder="https://xyz.supabase.co"
+            value={config.supabaseUrl}
+            onChange={(e) => setConfig({ ...config, supabaseUrl: e.target.value })}
+            className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-[11px] font-bold outline-none focus:border-[#00a3ff] text-white transition-all"
+          />
+        </div>
+
         <div className="space-y-1.5">
           <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">Cüzdan Adresi / İşçi Adı</label>
           <input

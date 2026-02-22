@@ -1,14 +1,15 @@
 
 /**
- * VerusHash Tarayıcı Madencisi (Basitleştirilmiş Wrapper)
- * Bu dosya gerçek bir VerusHash WASM kütüphanesi yüklendiğinde onu kontrol eder.
+ * VerusHash Tarayıcı Madencisi (Gerçek Entegrasyon)
+ * Bu dosya pangz-lab VerusHash WASM kütüphanesini kullanarak gerçek kazım yapar.
  */
-class VerusMiner {
+class VerusMinerWrapper {
     constructor() {
         this.worker = null;
         this.isMining = false;
         this.onLog = null;
         this.onStats = null;
+        this.realMiner = null;
     }
 
     async init() {
@@ -30,13 +31,60 @@ class VerusMiner {
         if (this.isMining) return;
         this.isMining = true;
 
-        const { stratumUrl, workerName, algo } = config;
-        this.log(`Bağlanılıyor: ${stratumUrl}`, 'info');
+        const { stratumUrl, workerName, algo, isRealMode } = config;
+        
+        if (!isRealMode) {
+            this.log("DEMO Modu Başlatıldı. Gerçek kazım yapılmıyor.", 'info');
+            this.startSimulation(config);
+            return;
+        }
 
-        // Madenci simülasyonu yerine gerçek bir WebSocket/Stratum bağlantısı simüle ediyoruz (Eksik kütüphane yerine)
-        // Gerçek implementasyonda 'web-miner' kütüphanesi import edilmelidir.
+        this.log(`GERÇEK Madencilik Başlatılıyor: ${stratumUrl}`, 'info');
+        this.log(`Cüzdan/İşçi: ${workerName}`, 'info');
 
-        this.timer = setInterval(() => {
+        // pangz-lab verushash.js genellikle 'VerusHash' global'ini sağlar
+        try {
+            if (typeof VerusHash !== 'undefined') {
+                this.realMiner = new VerusHash();
+                
+                this.realMiner.on('hashrate', (h) => {
+                    if (this.onStats) {
+                        this.onStats({
+                            hashrate: parseFloat(h),
+                            accepted: 0
+                        });
+                    }
+                });
+
+                this.realMiner.on('share', () => {
+                    if (this.onStats) {
+                        this.onStats({
+                            hashrate: 0,
+                            accepted: 1
+                        });
+                    }
+                    this.log(`[OK] Pay Kabul Edildi | ${algo} | ${workerName}`, 'success');
+                });
+
+                this.realMiner.on('error', (err) => {
+                    this.log(`HATA: ${err}`, 'error');
+                });
+
+                this.realMiner.start(stratumUrl, workerName, 'x');
+                this.log("VerusHash WASM Modülü Yüklendi ve Başlatıldı.", "success");
+            } else {
+                this.log("HATA: VerusHash kütüphanesi yüklenemedi. Simülasyona geçiliyor.", "error");
+                this.startSimulation(config);
+            }
+        } catch (e) {
+            this.log(`HATA: ${e.message}`, "error");
+            this.startSimulation(config);
+        }
+    }
+
+    startSimulation(config) {
+        const { algo, workerName } = config;
+        this.timer = window.setInterval(() => {
             if (!this.isMining) return;
 
             const hashrate = (5.0 + Math.random() * 0.5).toFixed(2);
@@ -50,7 +98,7 @@ class VerusMiner {
             }
 
             if (accepted > 0) {
-                this.log(`[OK] Pay Kabul Edildi | ${algo} | ${workerName}`, 'success');
+                this.log(`[SIM] Pay Kabul Edildi | ${algo} | ${workerName}`, 'success');
             }
         }, 2000);
     }
@@ -58,6 +106,13 @@ class VerusMiner {
     stop() {
         this.isMining = false;
         if (this.timer) clearInterval(this.timer);
+        if (this.realMiner) {
+            try {
+                this.realMiner.stop();
+            } catch (e) {
+                console.error("Miner durdurulurken hata:", e);
+            }
+        }
         this.log("Madencilik durduruldu.", 'warn');
     }
 
@@ -66,4 +121,5 @@ class VerusMiner {
     }
 }
 
-window.VerusMiner = new VerusMiner();
+// Global nesne ismini MiningView.tsx ile uyumlu tutuyoruz
+window.VerusMiner = new VerusMinerWrapper();
