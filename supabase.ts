@@ -5,7 +5,8 @@
  */
 
 // Varsayılan değerler (Kullanıcıdan gelen bilgilere göre)
-const DEFAULT_ANON_KEY = 'sbp_v0_a8427122d22c4380ffcb1e0f9b21083bdf1b4767';
+const DEFAULT_URL = 'https://barhazenghfnkrreccvx.supabase.co';
+const DEFAULT_ANON_KEY = 'sb_publishable_8kbYan0Vlble_doq4xumVQ_Zg8pzt5V';
 
 export const getSupabaseClient = () => {
     // @ts-ignore - CDN üzerinden gelen global nesne
@@ -17,7 +18,7 @@ export const getSupabaseClient = () => {
     }
 
     // URL ve Key öncelikle localStorage'dan (ayarlar), yoksa varsayılandan alınır
-    const url = localStorage.getItem('VITE_SUPABASE_URL');
+    const url = localStorage.getItem('VITE_SUPABASE_URL') || DEFAULT_URL;
     const key = localStorage.getItem('VITE_SUPABASE_ANON_KEY') || DEFAULT_ANON_KEY;
 
     if (!url) {
