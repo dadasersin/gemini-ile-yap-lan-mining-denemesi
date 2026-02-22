@@ -79,7 +79,7 @@ const MiningView: React.FC = () => {
       stratumUrl: MINING_DATA[0].providers[0].servers[0].url,
       workerName: 'RTDTYfTX9a8DdAfr9won6DspWxxobgxE21.mobile',
       algo: MINING_DATA[0].algo,
-      supabaseUrl: localStorage.getItem('VITE_SUPABASE_URL') || 'https://barhazenghfnkrreccvx.supabase.co',
+      supabaseUrl: 'https://barhazenghfnkrreccvx.supabase.co',
     };
   });
 
