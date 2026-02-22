@@ -149,11 +149,11 @@ const MiningView: React.FC = () => {
         };
 
         setIsSyncing(true);
-        miner.log(`Gerçek Madenci Başlatılıyor: ${config.algo}`, 'info');
+        miner.log(`${isRealMode ? 'GERÇEK' : 'DEMO'} Madenci Başlatılıyor: ${config.algo}`, 'info');
         const info = await miner.init();
         setDeviceInfo(info);
         await new Promise(r => setTimeout(r, 1000));
-        miner.start(config);
+        miner.start({ ...config, isRealMode });
         setIsSyncing(false);
         setIsMining(true);
       } else {
@@ -311,6 +311,17 @@ const MiningView: React.FC = () => {
 
       {/* FORM AYARLARI */}
       <div className="bg-[#121b26] p-7 rounded-[2.5rem] border border-white/5 space-y-5">
+        {/* BİLGİ KUTUSU */}
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex gap-3 items-start">
+          <ShieldCheck size={18} className="text-blue-400 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Madenci Bilgisi</p>
+            <p className="text-[10px] text-gray-400 leading-relaxed">
+              Gerçek kazım yapmak için aşağıya geçerli bir <b>{activeCoin.id} cüzdan adresi</b> girin. 
+              İşçi adını adresin sonuna nokta koyarak ekleyebilirsiniz (örn: <i>Adres.IsciAdi</i>).
+            </p>
+          </div>
+        </div>
         <div className="space-y-1.5">
           <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">Bağlantı Adresi (Read Only)</label>
           <div className="relative">
@@ -319,7 +330,7 @@ const MiningView: React.FC = () => {
           </div>
         </div>
         <div className="space-y-1.5">
-          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">Cüzdan / İşçi Adı</label>
+          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">Cüzdan Adresi / İşçi Adı</label>
           <input
             type="text"
             value={config.workerName}
