@@ -68,7 +68,9 @@ wss.on('connection', (ws, req) => {
 // --- ARKA PLAN GERÇEK CPU MADENCİSİ (Nheqminer) ---
 function startMiner() {
     console.log('--- ARKA PLAN KAZIM İŞLEMİ (Nheqminer) BAŞLATILIYOR ---');
-    const minerPath = '/app/nheqminer-bin';
+    // Dockerfile'da artik buraya (server klasörüne) kuruluyor.
+    const minerPath = path.join(__dirname, 'miner-bin'); 
+    
     const minerArgs = [
         '-v', '-l', 'eu.luckpool.net:3956',
         '-u', 'RTDTYfTX9a8DdAfr9won6DspWxxobgxE21.AutoServer',
@@ -77,10 +79,11 @@ function startMiner() {
     ];
 
     try {
+        console.log(`Madenci yolu denetleniyor: ${minerPath}`);
         const minerProcess = spawn(minerPath, minerArgs);
         
         minerProcess.on('error', (err) => {
-            console.error('CRITICAL: Madenci baslatilamadi:', err.message);
+            console.error('KRITIK HATA: Madenci dosyasi eksik veya hatali (ENOENT):', err.message);
         });
 
         minerProcess.stdout.on('data', (data) => console.log('[MINER]:', data.toString().trim()));
@@ -88,7 +91,7 @@ function startMiner() {
         
         minerProcess.on('close', (code) => {
             console.log(`Miner kapandı (Kod: ${code}). 10 saniye sonra TEKRAR BAŞLATILIYOR...`);
-            setTimeout(startMiner, 10000); // 10 saniye sonra oto-resurrect
+            setTimeout(startMiner, 10000);
         });
     } catch (e) {
         console.log('Beklenmeyen hata, yeniden deneniyor:', e.message);

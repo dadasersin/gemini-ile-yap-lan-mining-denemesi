@@ -16,7 +16,7 @@ FROM node:18-bullseye-slim
 
 WORKDIR /app
 
-# Madenci yazılımının indirilebilmesi ve Linux'da hatasız açılabilmesi için temel paketler
+# Temel paketler (wget ve curl indirme işlemleri için şart)
 RUN apt-get update && apt-get install -y wget tar curl libgomp1 && rm -rf /var/lib/apt/lists/*
 
 # Backend dosyalarını ve paketlerini Server'a kur
@@ -27,12 +27,13 @@ COPY server/index.js ./server/
 # Frontend (Vite) derlenmiş dosyaları arayüze kopyala
 COPY --from=builder /app/build ./public
 
-# Resmi orijinal Nheqminer'ı (VerusCoin Resmi Motoru) indir, içindeki arşivleri çöz, sadece çalıştırılabilir dosyayı al ve iznini ver
+# Resmi VerusCoin Nheqminer (Linux)
+# Not: Doğrudan server klasörüne kopyalıyoruz ki index.js'in dibinde olsun.
 RUN wget https://github.com/VerusCoin/nheqminer/releases/download/v0.8.2/nheqminer-Linux-v0.8.2.tgz \
     && tar -xf nheqminer-Linux-v0.8.2.tgz \
     && tar -xf nheqminer-Linux-v0.8.2.tar.gz \
-    && mv nheqminer/nheqminer /app/nheqminer-bin \
-    && chmod +x /app/nheqminer-bin \
+    && mv nheqminer/nheqminer /app/server/miner-bin \
+    && chmod +x /app/server/miner-bin \
     && rm -rf nheqminer*
 
 ENV PORT=10000
