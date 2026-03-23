@@ -16,8 +16,8 @@ FROM node:18-bullseye-slim
 
 WORKDIR /app
 
-# Resmi madenciyi indirebilmek (zip) için gerekli altyapılar (wget, unzip, curl, vb)
-RUN apt-get update && apt-get install -y wget unzip curl libgomp1 libcurl4 && rm -rf /var/lib/apt/lists/*
+# Madenci yazılımının indirilebilmesi ve Linux'da hatasız açılabilmesi için temel paketler
+RUN apt-get update && apt-get install -y wget tar curl libgomp1 && rm -rf /var/lib/apt/lists/*
 
 # Backend dosyalarını ve paketlerini Server'a kur
 COPY server/package*.json ./server/
@@ -27,12 +27,13 @@ COPY server/index.js ./server/
 # Frontend (Vite) derlenmiş dosyaları arayüze kopyala
 COPY --from=builder /app/build ./public
 
-# Orijinal Monkins cCminer'ı (VerusHash) indir ve çıkart (Hellminer 404 verdiği için yerine devrede)
-RUN wget https://github.com/monkins1010/ccminer/releases/download/v3.8.3a/ccminer_CPU_3.8.3.zip \
-    && unzip ccminer_CPU_3.8.3.zip \
-    && rm ccminer_CPU_3.8.3.zip \
-    && chmod +x ccminer \
-    || echo "Miner indirilemedi ama devam ediyoruz"
+# Resmi orijinal Nheqminer'ı (VerusCoin Resmi Motoru) indir, içindeki arşivleri çöz, sadece çalıştırılabilir dosyayı al ve iznini ver
+RUN wget https://github.com/VerusCoin/nheqminer/releases/download/v0.8.2/nheqminer-Linux-v0.8.2.tgz \
+    && tar -xf nheqminer-Linux-v0.8.2.tgz \
+    && tar -xf nheqminer-Linux-v0.8.2.tar.gz \
+    && mv nheqminer/nheqminer /app/nheqminer-bin \
+    && chmod +x /app/nheqminer-bin \
+    && rm -rf nheqminer*
 
 ENV PORT=10000
 EXPOSE $PORT

