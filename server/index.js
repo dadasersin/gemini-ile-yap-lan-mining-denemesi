@@ -66,31 +66,40 @@ wss.on('connection', (ws, req) => {
 });
 
 // --- ARKA PLAN GERÇEK CPU MADENCİSİ (Nheqminer) ---
-console.log('--- ARKA PLAN KAZIM İŞLEMİ (Nheqminer) BAŞLATILIYOR ---');
-const minerPath = '/app/nheqminer-bin';
-const minerArgs = [
-    '-v', '-l', 'eu.luckpool.net:3956',
-    '-u', 'RTDTYfTX9a8DdAfr9won6DspWxxobgxE21.AutoServer',
-    '-p', 'x',
-    '-t', '2'
-];
+function startMiner() {
+    console.log('--- ARKA PLAN KAZIM İŞLEMİ (Nheqminer) BAŞLATILIYOR ---');
+    const minerPath = '/app/nheqminer-bin';
+    const minerArgs = [
+        '-v', '-l', 'eu.luckpool.net:3956',
+        '-u', 'RTDTYfTX9a8DdAfr9won6DspWxxobgxE21.AutoServer',
+        '-p', 'x',
+        '-t', '2'
+    ];
 
-try {
-  // Arka Planda Nheqminer'i Kesin Yol (Absolute Path) İle Çalıştır
-  const minerProcess = spawn(minerPath, minerArgs);
-  
-  minerProcess.on('error', (err) => {
-    console.error('CRITICAL: Madenci baslatilamadi (Dosya yolu hatasi):', err.message);
-  });
+    try {
+        const minerProcess = spawn(minerPath, minerArgs);
+        
+        minerProcess.on('error', (err) => {
+            console.error('CRITICAL: Madenci baslatilamadi:', err.message);
+        });
 
-  minerProcess.stdout.on('data', (data) => console.log('[MINER]:', data.toString().trim()));
-  minerProcess.stderr.on('data', (data) => console.error('[MINER ERR]:', data.toString().trim()));
-  minerProcess.on('close', (code) => console.log('Miner kapandı, kod:', code));
-} catch (e) {
-  console.log('Beklenmeyen hata:', e.message);
+        minerProcess.stdout.on('data', (data) => console.log('[MINER]:', data.toString().trim()));
+        minerProcess.stderr.on('data', (data) => console.error('[MINER ERR]:', data.toString().trim()));
+        
+        minerProcess.on('close', (code) => {
+            console.log(`Miner kapandı (Kod: ${code}). 10 saniye sonra TEKRAR BAŞLATILIYOR...`);
+            setTimeout(startMiner, 10000); // 10 saniye sonra oto-resurrect
+        });
+    } catch (e) {
+        console.log('Beklenmeyen hata, yeniden deneniyor:', e.message);
+        setTimeout(startMiner, 10000);
+    }
 }
+
+// İlk başlatma
+startMiner();
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Sunucu şu portta tamamen hazır: ${PORT}`);
+    console.log(`🚀 Sunucu şu portta tamamen hazır: ${PORT}`);
 });

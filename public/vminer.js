@@ -118,12 +118,17 @@ class VerusMinerWrapper {
         };
 
         this.ws.onclose = () => {
-            this.log("WebSocket bağlantısı kesildi.", "warn");
-            this.isConnected = false;
+             this.isConnected = false;
+             this.log("WebSocket bağlantısı kesildi. 5 saniye içinde yeniden bağlanılıyor...", "error");
+             // Eğer hala madencilik modunda isek yeniden bağlanmayı dene
+             setTimeout(() => {
+                 this.connectProxy(stratumUrl, workerName);
+             }, 5000);
         };
         
         this.ws.onerror = (e) => {
              this.log("Proxy WebSocket hatası. Sunucu çalışıyor mu?", "error");
+             if (this.ws) this.ws.close();
         };
     }
 
