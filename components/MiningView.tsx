@@ -109,19 +109,58 @@ const MiningView: React.FC = () => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
-  // Madencilik Simülasyon Döngüsü (Artık sadece UI değerlerini günceller)
+  // Cüzdan Bakiyesi ve Anlık Fiyat Çekme
+  const fetchRealBalance = async () => {
+    try {
+      // Sadece adresi ayır: 'RTDTYfTX9a... .worker1' => 'RTDTYfTX9a...'
+      const address = config.workerName.split('.')[0];
+      
+      // Veritabanından (Verus Explorer) gerçek bakiye çekme
+      const balRes = await fetch(`https://insight.verus.io/api/addr/${address}/?noTxList=1`);
+      const balData = await balRes.json();
+      
+      // CoinGecko'dan canlı USD fiyat çekme
+      let price = currentPrice;
+      try {
+        const priceRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=verus-coin&vs_currencies=usd');
+        const priceData = await priceRes.json();
+        if (priceData && priceData['verus-coin']) {
+          price = priceData['verus-coin'].usd;
+          setCurrentPrice(price);
+        }
+      } catch (e) { /* Hata varsa varsayılan fiyatı kullan */ }
+
+      const realBalance = balData.balance || 0;
+      
+      setStats(prev => ({
+        ...prev,
+        balanceCrypto: realBalance,
+        balanceUSDT: realBalance * price
+      }));
+
+    } catch (err) {
+      console.log("Bakiye çekilirken hata oluştu, lütfen adresi kontrol edin.");
+    }
+  };
+
+  useEffect(() => {
+    // Sayfa açıldığında ilk bakiyeyi hemen getir
+    fetchRealBalance();
+    
+    // Her 60 saniyede bir bakiyeyi ve dolar fiyatını senkronize et
+    const balInterval = setInterval(fetchRealBalance, 60000);
+    return () => clearInterval(balInterval);
+  }, [config.workerName]);
+
+  // Madencilik Performans Güncelleme Döngüsü (Grafikler İçin)
   useEffect(() => {
     let interval: number | null = null;
 
     if (isMining) {
       interval = window.setInterval(() => {
-        // Fiyat Dalgalanması
-        setCurrentPrice(prev => prev + (Math.random() - 0.5) * 0.01);
-
         setStats(prev => ({
           ...prev,
-          temp: `${(55 + Math.random() * 12).toFixed(1)}°C`,
-          balanceUSDT: prev.balanceCrypto * currentPrice
+          temp: `${(55 + Math.random() * 12).toFixed(1)}°C`
         }));
 
         setChartData(prev => [...prev.slice(-19), {
@@ -132,7 +171,7 @@ const MiningView: React.FC = () => {
     }
 
     return () => { if (interval) clearInterval(interval); };
-  }, [isMining, currentPrice, stats.hashrate, stats.balanceCrypto]);
+  }, [isMining, stats.hashrate]);
 
   // Supabase Veri Kaydı
   useEffect(() => {

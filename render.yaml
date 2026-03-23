@@ -1,0 +1,13 @@
+services:
+  # Render'da "Web Service" olarak ayağa kalkacak
+  - type: web
+    name: cryptobot-pro-miner
+    env: docker
+    plan: free
+    region: frankfurt # Size en yakın lokasyon seçimi
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production
